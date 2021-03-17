@@ -1,0 +1,304 @@
+
+
+```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+## feature 1: numeric vector
+geneList <- weighted_metagenes[,i]
+## feature 2: named vector
+names(geneList) <- rownames(weighted_metagenes)
+
+## feature 3: decreasing order
+geneList <- sort(geneList, decreasing = TRUE)
+data(geneList, package="DOSE")
+
+#define driver genes
+ind_pos_tail_3SD=which(weighted_metagenes[,i]>Mean[i]+3*SD[i])
+ind_neg_tail_3SD=which(weighted_metagenes[,i]<Mean[i]-3*SD[i])
+gene_pos_tail = weighted_metagenes[ind_pos_tail_3SD,i]
+gene_neg_tail = weighted_metagenes[ind_neg_tail_3SD,i]
+names(gene_pos_tail) = rownames(weighted_metagenes[ind_pos_tail_3SD,])
+names(gene_neg_tail) = rownames(weighted_metagenes[ind_neg_tail_3SD,])
+genes=c(gene_pos_tail, gene_neg_tail)
+gene_pos_tail_temp = sort(gene_pos_tail, decreasing = TRUE)
+gene_neg_tail_temp = sort(gene_neg_tail, decreasing = TRUE)
+gene_pos_tail_list = bitr(names(gene_pos_tail_temp), fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+gene_neg_tail_list = bitr(names(gene_neg_tail_temp), fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+
+#for the overview
+ key_pos = paste0("C",i,"_p")
+ key_neg = paste0("C",i,"_n")
+ gcSample_pos[[ key_pos ]] <- gene_pos_tail_list$ENTREZID
+ gcSample_neg[[ key_pos ]] <- gene_neg_tail_list$ENTREZID
+```
+
+### `r paste0("Community ",i)`
+
+#### `r paste0("GO enrichment for community ",i)`
+Let us take a look at the results of the enrichments of the drivers of the positive and negative tails based on Gene Ontology.
+
+```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+#GO
+ego_pos <- enrichGO(gene      = gene_pos_tail_list$ENTREZID,
+                    universe      = names(geneList),
+                    OrgDb         = org.Hs.eg.db,
+                    ont           = "ALL",
+                    pAdjustMethod = "BH",
+                    pvalueCutoff  = 0.01,
+                    qvalueCutoff  = 0.01,
+                    readable      = TRUE)
+
+ego_neg <- enrichGO(gene      = gene_neg_tail_list$ENTREZID,
+                    universe      = names(geneList),
+                    OrgDb         = org.Hs.eg.db,
+                    ont           = "ALL",
+                    pAdjustMethod = "BH",
+                    pvalueCutoff  = 0.01,
+                    qvalueCutoff  = 0.01,
+                    readable      = TRUE)
+
+datatable(data.frame(ego_pos), rownames=FALSE, caption=paste0("\n\n\nGO overexpression analysis for drivers (pos tail) in community ",i) ) 
+datatable(data.frame(ego_neg), rownames=FALSE, caption=paste0("\n\n\nGO overexpression analysis for drivers (neg tail) in community ",i)) 
+
+if (nrow(ego_pos) > 0 & nrow(ego_neg) == 0 )
+{
+  go1_d <- dotplot(ego_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot of the drivers (pos tail) in community ",i))
+  print(plot_grid(go1_d, ncol=1)) 
+  if (nrow(ego_pos) > 1)
+  {
+    go1_e <- emapplot(ego_pos, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot of the drivers (pos tail) in community ",i))
+    print(plot_grid(go1_e, ncol=1)) #, labels=LETTERS[1:4]
+  }
+  go1_c <- cnetplot(ego_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the drivers (pos tail) in community ",i))
+  print(plot_grid(go1_c, ncol=1)) #, labels=LETTERS[1:4]
+} else if(nrow(ego_pos) == 0 & nrow(ego_neg) > 0 )
+{
+  go2_d <- dotplot(ego_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot of the drivers drivers (neg tail) in community ",i))
+  print(plot_grid(go2_d, ncol=1)) 
+  if (nrow(ego_neg) > 1)
+  {
+    go2_e <- emapplot(ego_neg, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot of the drivers (neg tail) in community ",i))
+    print(plot_grid(go2_e, ncol=1)) #, labels=LETTERS[1:4]  
+  }
+  go2_c <- cnetplot(ego_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the drivers (neg tail) in community ",i))
+  print(plot_grid(go2_c, ncol=1)) #, labels=LETTERS[1:4]
+} else if (nrow(ego_pos) > 0 & nrow(ego_neg) > 0 )
+{
+  go1_d <- dotplot(ego_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot of the drivers drivers (pos tail) in community ",i))
+  go2_d <- dotplot(ego_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot of the drivers drivers (neg tail) in community ",i))
+  print(plot_grid(go1_d,go2_d, ncol=2)) 
+  if (nrow(ego_pos) > 1 & nrow(ego_neg) > 1 )
+  {
+    go1_e <- emapplot(ego_pos, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot of the  drivers (pos tail) in community ",i))
+    go2_e <- emapplot(ego_neg, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot of the  drivers (neg tail) in community ",i))
+    print(plot_grid(go1_e, go2_e, ncol=2)) #, labels=LETTERS[1:4]
+  }
+  go1_c <- cnetplot(ego_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the drivers (pos tail) in community ",i))
+  go2_c <- cnetplot(ego_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the drivers (neg tail) in community ",i))
+  print(plot_grid(go1_c, go2_c, ncol=2)) #, labels=LETTERS[1:4]
+}
+
+
+ego_gse <- gseGO(geneList     = geneList,
+              OrgDb        = org.Hs.eg.db,
+              ont          = "ALL",
+              nPerm        = nPerm, 
+              minGSSize    = 10,
+              maxGSSize    = 900,
+              pvalueCutoff = 0.05,
+              pAdjustMethod = "BH",
+              verbose      = FALSE)
+
+ego_gse <- setReadable(ego_gse, 'org.Hs.eg.db',keyType = "auto")
+ind_NES=which(abs(ego_gse$NES)>=2)
+ego_gse=ego_gse[ind_NES,]
+ego_gse_pos=ego_gse[which(ego_gse$NES>=2),]
+ind_order_pos=order(ego_gse_pos$NES, decreasing=TRUE)
+ego_gse_pos=ego_gse_pos[ind_order_pos,]
+ego_gse_neg=ego_gse[which(ego_gse$NES<=-2),]
+ind_order_neg=order(ego_gse_neg$NES, decreasing=FALSE)
+ego_gse_neg=ego_gse_neg[ind_order_neg,]
+
+datatable(data.frame(ego_gse_pos), rownames=FALSE, caption=paste0("\n\n\nGO gsea for drivers (pos tail) in community ",i))
+datatable(data.frame(ego_gse_neg), rownames=FALSE, caption=paste0("\n\n\nGO gsea for drivers (neg tail) in community ",i))
+
+#go_gsea <- dotplot(ego_gse, showCategory=20) + ggtitle(paste0("GO - drivers (pos tail) in community ",i))
+#print(plot_grid(go_gsea, ncol=1)) 
+```
+
+<br><br>
+
+#### `r paste0("KEGG enrichment for community ",i)`
+Let us now take a look at the results of the enrichments of the drivers of the positive and negative tails based on KEGG.
+
+```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+#KEGG
+ek_pos <- enrichKEGG(gene = gene_pos_tail_list$ENTREZID,
+                     organism     = 'hsa',
+                     pvalueCutoff = 0.01)
+
+ek_neg <- enrichKEGG(gene = gene_neg_tail_list$ENTREZID,
+                     organism     = 'hsa',
+                     pvalueCutoff = 0.01)
+
+ek_pos <- setReadable(ek_pos, 'org.Hs.eg.db','ENTREZID')
+ek_neg <- setReadable(ek_neg, 'org.Hs.eg.db', 'ENTREZID')
+
+DT::datatable(data.frame(ek_pos), rownames=FALSE, caption=paste0("\n\n\nKEGG overexpression analysis for drivers (pos tail) in community ",i))
+DT::datatable(data.frame(ek_neg), rownames=FALSE, caption=paste0("\n\n\nKEGG overexpression analysis for drivers (neg tail) in community ",i))
+
+ek1_d <- dotplot(ek_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (pos tail) in community ",i))
+ek2_d <- dotplot(ek_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (neg tail) in community ",i))
+
+if (nrow(ek_pos) > 0 & nrow(ek_neg) == 0 )
+{
+  print(plot_grid(ek1_d, ncol=1))
+  if (nrow(ek_pos) > 1)
+  {
+    ek1_e <- emapplot(ek_pos, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot for the drivers (pos tail) in community ",i))
+    print(plot_grid(ek1_e, ncol=1)) #, labels=LETTERS[1:4]
+  }
+  ek1_c <- cnetplot(ek_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (pos tail) in community ",i))
+  print(plot_grid(ek1_c, ncol=1)) #, labels=LETTERS[1:4]
+} else if(nrow(ek_pos) == 0 & nrow(ek_neg) > 0 )
+{
+  print(plot_grid(ek2_d, ncol=1))
+  if (nrow(ek_neg) > 1)
+  {
+    ek2_e <- emapplot(ek_neg, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot for the drivers (neg tail) in community ",i))
+    print(plot_grid(ek2_e, ncol=1)) #, labels=LETTERS[1:4]
+  }
+  ek2_c <- cnetplot(ek_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (neg tail) in community ",i))
+  print(plot_grid(ek2_c, ncol=1)) #, labels=LETTERS[1:4]
+} else if (nrow(ek_pos) > 0 & nrow(ek_neg) > 0 )
+{
+  print(plot_grid(ek1_d,ek2_d, ncol=2))
+   if (nrow(ek_pos) > 1 & nrow(ek_neg) > 1 )
+   {
+      ek1_e <- emapplot(ek_pos, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot for the drivers (pos tail) in community ",i))
+      ek2_e <- emapplot(ek_neg, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot for the drivers (neg tail) in community ",i))
+      print(plot_grid(ek1_e, ek2_e, ncol=2)) #, labels=LETTERS[1:4]
+   }
+  ek1_c <- cnetplot(ek_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (pos tail) in community ",i))
+  ek2_c <- cnetplot(ek_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (neg tail) in community ",i))
+  print(plot_grid(ek1_c, ek2_c, ncol=2)) #, labels=LETTERS[1:4]
+}
+
+
+ek_gse <- gseKEGG(geneList     = geneList,
+               organism     = 'hsa',
+               nPerm        = nPerm,
+               minGSSize    = 10,
+               maxGSSize = 900,
+               pvalueCutoff = 0.05,
+               verbose      = FALSE)
+
+ek_gse <- setReadable(ek_gse, 'org.Hs.eg.db',keyType = "ENTREZID")
+ind_NES=which(abs(ek_gse$NES)>=2)
+ek_gse=ek_gse[ind_NES,]
+ek_gse_pos=ek_gse[which(ek_gse$NES>=2),]
+ind_order_pos=order(ek_gse_pos$NES, decreasing=TRUE)
+ek_gse_pos=ek_gse_pos[ind_order_pos,]
+ek_gse_neg=ek_gse[which(ek_gse$NES<=-2),]
+ind_order_neg=order(ek_gse_neg$NES, decreasing=FALSE)
+ek_gse_neg=ek_gse_neg[ind_order_neg,]
+
+datatable(data.frame(ek_gse_pos), rownames=FALSE, caption=paste0("\n\n\nKEGG gsea for drivers (pos tail) in community ",i))
+datatable(data.frame(ek_gse_neg), rownames=FALSE, caption=paste0("\n\n\nKEGG gsea for drivers (neg tail) in community ",i))
+
+```
+
+<br><br>
+
+#### `r paste0("DO enrichment for community ",i)`
+Finally, let us take a look at the results of the enrichments of the drivers of the positive and negative tails based on Disease Ontology.
+
+```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+#DO
+edo_pos <- enrichDO(gene  = gene_pos_tail_list$ENTREZID,
+                    ont           = "DO",
+                    pvalueCutoff  = 0.01,
+                    pAdjustMethod = "BH",
+                    universe      = names(geneList),
+                    minGSSize     = 5,
+                    maxGSSize     = 500,
+                    qvalueCutoff  = 0.01,
+                    readable      = FALSE)
+
+edo_neg <- enrichDO(gene  = gene_neg_tail_list$ENTREZID,
+                    ont           = "DO",
+                    pvalueCutoff  = 0.01,
+                    pAdjustMethod = "BH",
+                    universe      = names(geneList),
+                    minGSSize     = 5,
+                    maxGSSize     = 500,
+                    qvalueCutoff  = 0.01,
+                    readable      = FALSE)
+
+edo_pos <- setReadable(edo_pos, 'org.Hs.eg.db')
+edo_neg <- setReadable(edo_neg, 'org.Hs.eg.db')
+
+
+DT::datatable(data.frame(edo_pos), rownames=FALSE, caption=paste0("\n\n\nDO overexpression analysis for drivers (pos tail) in community ",i))
+DT::datatable(data.frame(edo_neg), rownames=FALSE, caption=paste0("\n\n\nDO overexpression analysis for drivers (neg tail) in community ",i))
+
+if (nrow(edo_pos) > 0 & nrow(edo_neg) == 0 )
+{
+  do1_d <- dotplot(edo_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (pos tail) in community ",i))
+  print(plot_grid(do1_d, ncol=1))
+  if (nrow(edo_pos) > 1)
+  {
+    do1_e <- emapplot(edo_pos, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot for the drivers (pos tail) in community ",i))
+    print(plot_grid(do1_e, ncol=1)) #, labels=LETTERS[1:4]    
+  }
+  do1_c <- cnetplot(edo_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the  drivers (pos tail) in community ",i))
+  print(plot_grid(do1_c, ncol=1)) #, labels=LETTERS[1:4]
+} else if(nrow(edo_pos) == 0 & nrow(edo_neg) > 0 )
+{
+  do2_d <- dotplot(edo_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (neg tail) in community ",i))
+  print(plot_grid(do2_d, ncol=1))
+  if (nrow(edo_neg) > 1)
+  {
+    do2_e <- emapplot(edo_neg, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot for the drivers (neg tail) in community ",i))
+    print(plot_grid(do2_e, ncol=1)) #, labels=LETTERS[1:4]
+  }
+  do2_c <- cnetplot(edo_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (neg tail) in community ",i))
+  print(plot_grid(do2_c, ncol=1)) #, labels=LETTERS[1:4]
+} else if (nrow(edo_pos) > 0 & nrow(edo_neg) > 0 )
+{
+  do1_d <- dotplot(edo_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (pos tail) in community ",i))
+  do2_d <- dotplot(edo_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (neg tail) in community ",i))
+  print(plot_grid(do1_d,do2_d, ncol=2))
+  if (nrow(edo_pos) > 1 & nrow(edo_neg) > 1 )
+  {
+    do1_e <- emapplot(edo_pos, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot for the drivers (pos tail) in community ",i))
+    do2_e <- emapplot(edo_neg, pie_scale=2) + ggtitle(paste0("\n\n\nemapplot for the drivers (neg tail) in community ",i))
+    print(plot_grid(do1_e, do2_e, ncol=2)) #, labels=LETTERS[1:4]
+  }
+  do1_c <- cnetplot(edo_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (pos tail) in community ",i))
+  do2_c <- cnetplot(edo_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (neg tail) in community ",i))
+  print(plot_grid(do1_c, do2_c, ncol=2)) #, labels=LETTERS[1:4]
+}
+
+
+edo_gse <- gseDO(geneList,
+           nPerm         = nPerm,
+           minGSSize     = 10,
+           maxGSSize = 900,
+           pvalueCutoff  = 0.05,
+           pAdjustMethod = "BH",
+           verbose       = FALSE)
+
+edo_gse <- setReadable(edo_gse, 'org.Hs.eg.db',keyType = "auto")
+ind_NES=which(abs(edo_gse$NES)>=2)
+edo_gse=edo_gse[ind_NES,]
+edo_gse_pos=edo_gse[which(edo_gse$NES>=2),]
+ind_order_pos=order(edo_gse_pos$NES, decreasing=TRUE)
+edo_gse_pos=edo_gse_pos[ind_order_pos,]
+edo_gse_neg=edo_gse[which(edo_gse$NES<=-2),]
+ind_order_neg=order(edo_gse_neg$NES, decreasing=FALSE)
+edo_gse_neg=edo_gse_neg[ind_order_neg,]
+
+datatable(data.frame(edo_gse_pos), rownames=FALSE, caption=paste0("\n\n\nDO gsea for drivers (pos tail) in community ",i))
+datatable(data.frame(edo_gse_neg), rownames=FALSE, caption=paste0("\n\n\nDO gsea for drivers (neg tail) in community ",i))
+```
+
+<br><br><br>

@@ -1,0 +1,273 @@
+---
+title: "Deconvolution of gene expression Ewing Sarcoma datasets"
+author: "Jane Merlevede & Andrei Zinovyev"
+date: "`r format(Sys.time(), '%m/%d/%y')`" #"02/15/2021"
+output:
+  bookdown::html_document2:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 4
+    number_sections: true  
+    df_print: paged
+---
+
+
+```{r variable_definition, echo=FALSE}
+#Options to be defined by the user
+tumor_type="ES"
+nPerm=10000 #Nb permutations for gsea
+top_driver_genes=5 #Nb of top driver genes to show in table
+```
+
+```{r file_loading, echo=FALSE} 
+#input files to provide
+weighted_metagenes = read.table(paste0(tumor_type,"_weighted_metagenes"), header = TRUE, sep="\t") #weighted metagenes previously computed
+datasets_info = read.table("../datasets_info", header = TRUE, sep="\t", as.is=TRUE) #info about the datasets
+community_comp = read.table(paste0(tumor_type,"_communities"), header = TRUE, sep="\t") #first impl
+community_best_pathways = read.table(paste0(tumor_type,"_best_pathways"), header = TRUE, sep="\t") #second impl
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r package_loading, echo=FALSE, message = FALSE}
+library("stringr")
+library("knitr")
+library("clusterProfiler")
+library("vroom")
+library("DOSE")
+library("ggplot2")
+library("cowplot")
+library("DT")
+```
+
+
+# Introduction
+
+We described here the analyses performed on `r tumor_type` gene expression datasets. Our goal is to identify robust (across different datasets) mechanims active in `r tumor_type` tumors.
+
+This report described in details the communities identified: their component names, their techno type (bulk or single), their data type (patient, PDX, cell line, controls) and the significantly enriched gene sets. It also briefly describes the main methodological steps of the approach. 
+
+The inputs needed are:
+* weighted metagenes previously computed
+* the community composition obtained after the computation of weighted metagenes
+* information about the datasets
+
+
+This work is in the scope of D3.1 iPC deliverable.
+
+Here we focused on Ewing sarcoma, for which we gathered 20 datasets: 
+
+* 5 bulk datasets of patients
+* 4 single cell cell lines
+* 8 single cell PDX
+* 3 single cell controls (including 2 full embryos GSE137804)
+
+```{r dataset_infos, echo=FALSE}
+datasets_info_ES = subset(datasets_info, tumor_type=="ES")
+datasets_info_ctrl=subset(datasets_info, tumor_type=="Ctrl")
+data_infos=rbind(datasets_info_ES, datasets_info_ctrl)
+data_infos=data_infos[,-1]
+kable(data_infos[,c(4,1:3)])
+```
+
+# Description of the communities
+
+## Community composition
+In `r tumor_type` datasets, `r nrow(community_comp)` communities containing at least 3 distinct datasets were identified. The number of components per community and the community composition are shown below.
+
+```{r table_community_composition, echo=FALSE}
+barplot(rowSums(!is.na(community_comp)), xlab="Community", ylab="Nb of components", main="Nb of components per community", names.arg = 1:nrow(community_comp))
+datatable(community_comp)
+```
+Now, we want to characterize these communities by the nature of the components they contain and by the mechanims they represent. 
+
+## Nature of the communities
+First, for each community, we describe how many components they contain and from how many unique datatsets they come from. 
+We also show how many bulk and single cell data were gathered. The sample type, patients, cell lines, PDX and controls is also given and is a first clue for the interpretation.
+
+```{r datasets_info, echo=FALSE} 
+community_stats=as.data.frame(matrix(0, nrow = nrow(community_comp), ncol = 0))
+community_stats$community=paste0("C",1:nrow(community_comp))
+community_stats$nb_comp = rowSums(!is.na(community_comp))
+
+for (c in 1:nrow(community_comp))
+{
+  current_community = community_comp[c,!is.na(community_comp[c,])]
+  comp_name=rep(0,length(current_community))
+  for (k in 1:length(current_community))
+  {
+    comp_name[k] = unlist(str_split(current_community[1,k],"_metagene"))[1]
+  }
+  
+  ind_comp_current_community = which(datasets_info$Acronym %in% comp_name)
+  datasets_info_current_community = datasets_info[ind_comp_current_community,]
+  
+  community_stats$nb_comp_unique[c] = length(unique(comp_name))
+  community_stats$nb_bulk[c]= sum(datasets_info_current_community$Techno=="bulk")
+  community_stats$nb_sc[c]= sum(datasets_info_current_community$Techno=="single-cell")
+  community_stats$nb_patient[c] = sum(datasets_info_current_community$data_type=="Patient")
+  community_stats$nb_cellline[c] = sum(datasets_info_current_community$data_type=="cell-line")
+  community_stats$nb_PDX[c] = sum(datasets_info_current_community$data_type=="PDX")
+  community_stats$nb_control[c] = sum(datasets_info_current_community$data_type=="control")  
+}
+kable(community_stats)
+```
+
+```{r datasets_info_to_mention_in_text, echo=FALSE, message=FALSE, warning=FALSE} 
+nb_bulk_only=length(which(community_stats$nb_sc == 0))
+nb_sc_only=length(which(community_stats$nb_bulk == 0))
+nb_no_control=length(which(community_stats$nb_control == 0))
+```
+
+`r nrow(community_stats)-nb_bulk_only-nb_sc_only` out of `r nrow(community_stats)` communities are a mixture of bulk and single cell data, `r nb_bulk_only` contains only bulk and `r nb_sc_only` contains only single cell datasets.
+
+`r nb_no_control` out of `r nrow(community_stats)` communities does not contain any control. As we want to focuse on tumor related signals, we can exclude communities containing at least one component from control datasets. Thus we further focuse on `r nb_no_control` communities, which are communities `r which(community_stats$nb_control == 0)`. !!! To discuss with Andrei !!!
+
+## Driver genes
+
+The driver genes (genes with the hightest and smallest weights) are shown below for each component.
+```{r table_driver_genes, echo=FALSE, message=FALSE, warning=FALSE}
+#for each weighted metagenes of interest, drivers are the genes beyond 3 SD from the mean
+Mean=colMeans(weighted_metagenes, na.rm = TRUE)
+SD=apply(weighted_metagenes,2,sd, na.rm = TRUE)
+
+nb_pos_tail_3SD=nb_neg_tail_3SD=rep(0,ncol(weighted_metagenes))
+scores_pos_tail_3SD=scores_neg_tail_3SD=rep(0,ncol(weighted_metagenes))
+fn = paste0(tumor_type,"_driver_genes")
+if (file.exists(fn,showWarnings = FALSE)) {
+  #Delete file if it exists
+  file.remove(fn)
+}
+
+for (k in 1:ncol(weighted_metagenes))
+{
+  ind_pos_tail_3SD=which(weighted_metagenes[,k]>Mean[k]+3*SD[k])
+  ind_neg_tail_3SD=which(weighted_metagenes[,k]<Mean[k]-3*SD[k])
+  genes_pos_tail= rownames(weighted_metagenes[ind_pos_tail_3SD,])
+  genes_neg_tail= rownames(weighted_metagenes[ind_neg_tail_3SD,])
+  genes=c(genes_pos_tail, genes_neg_tail)
+  scores=c(weighted_metagenes[ind_pos_tail_3SD,k], weighted_metagenes[ind_neg_tail_3SD,k])
+  driver_genes=data.frame(cbind(paste0("C",k), genes, scores))
+  write.table(driver_genes , paste0(tumor_type,"_driver_genes"), sep="\t", row.names = FALSE, append=TRUE, 
+              col.names=!file.exists( paste0(tumor_type,"_driver_genes")), quote=FALSE)
+}
+
+driver_genes = read.table(paste0(tumor_type,"_driver_genes"), header = TRUE, sep="\t", as.is=TRUE)
+table_top_drivers=data.frame(Community=numeric(nrow(community_comp)), Driver_pos_tail=numeric(nrow(community_comp)), Driver_neg_tail=numeric(nrow(community_comp)))
+for (i in 1:nrow(community_comp))
+{
+  community = subset(driver_genes, V1==paste0("C",i))
+  community_pos = community[which(community$scores>=0),]
+  community_neg = community[which(community$scores<0),]  
+  community_pos = community_pos[order(community_pos$scores,decreasing=TRUE),]
+  community_neg = community_pos[order(community_neg$scores,decreasing=FALSE),]
+  
+  table_top_drivers$Community[i] <- paste0("C",i)
+  table_top_drivers$Driver_pos_tail[i] = paste0(community_pos$genes[1:top_driver_genes], collapse=";")
+  table_top_drivers$Driver_neg_tail[i] = paste0(community_neg$genes[1:top_driver_genes], collapse=";")
+}
+datatable(table_top_drivers)
+```
+
+# Annotation of the communities
+
+To decipher the mechnanisms active in the communities, we extracted the driver genes in each community and performed over representation analysis as well as gene set enrichment analyses using MSigDB (http://www.gsea-msigdb.org/gsea/msigdb/collections.jsp) on each community.
+
+## Over representation analysis of the driver genes and gene set enrichment analysis for each community
+
+Now we can describe each component in details. We used GO, KEGG and DO ontology to annotate the communities. Results are represented in dotplots, cnetplots ans emaplots for both drviers of the positive and negative tails using clusterProfiler (https://bookdown.org/yihui/rmarkdown/html-document.html). If the OR analysis had no enrichment in one or the two tails, no plot are reported. We used GO, KEGG and disease ontology databases.
+
+```{r communities_OR_details, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+gcSample_pos = list()
+gcSample_neg = list()
+Mean=colMeans(weighted_metagenes, na.rm = TRUE)
+SD=apply(weighted_metagenes,2,sd, na.rm = TRUE)
+out <- NULL
+
+for (i in 1:nrow(community_comp)) #nrow(community_comp) 
+{
+  out <- c(out, knit_child('template_pathway_analysis.Rmd', quiet = TRUE))
+}
+```
+
+`r paste(out, collapse='\n')`
+
+
+## Overview of over representation analysis in driver genes of all communities
+Driver genes were submitted to over representation analysis. First, we show an overview of the drivers coming from the postive and negative tails for all components and next, we give details about each component.
+
+```{r communities_overview, echo=FALSE, message = FALSE, warning = FALSE, fig.height=30, fig.width=40}
+#, fig.cap=c("KEGG overrepresentation of positive tail", "KEGG overrepresentation of negative tail", "GO overrepresentation of positive tail", "GO overrepresentation of negative tail", "DO overrepresentation of positive tail", "DO overrepresentation of negative tail")
+#,fig.fullwidth = TRUE
+gcSample_pos = list()
+gcSample_neg = list()
+Mean=colMeans(weighted_metagenes, na.rm = TRUE)
+SD=apply(weighted_metagenes,2,sd, na.rm = TRUE)
+for (i in 1:nrow(community_comp))
+{
+ ## feature 1: numeric vector
+ geneList <- weighted_metagenes[,i]
+ ## feature 2: named vector
+ names(geneList) <- rownames(weighted_metagenes)
+
+ ## feature 3: decreasing order
+ geneList <- sort(geneList, decreasing = TRUE)
+ data(geneList, package="DOSE")
+
+ #define driver genes
+ ind_pos_tail_3SD=which(weighted_metagenes[,i]>Mean[i]+3*SD[i])
+ ind_neg_tail_3SD=which(weighted_metagenes[,i]<Mean[i]-3*SD[i])
+ genes_pos_tail= rownames(weighted_metagenes[ind_pos_tail_3SD,i])
+ genes_neg_tail= rownames(weighted_metagenes[ind_neg_tail_3SD,i])
+ genes=c(genes_pos_tail, genes_neg_tail)
+
+ gene_pos_tail = weighted_metagenes[ind_pos_tail_3SD,i]
+ gene_neg_tail = weighted_metagenes[ind_neg_tail_3SD,i]
+ names(gene_pos_tail) = rownames(weighted_metagenes[ind_pos_tail_3SD,])
+ names(gene_neg_tail) = rownames(weighted_metagenes[ind_neg_tail_3SD,])
+ gene_pos_tail_temp = sort(gene_pos_tail, decreasing = TRUE)
+ gene_neg_tail_temp = sort(gene_neg_tail, decreasing = TRUE)
+ gene_pos_tail_list = bitr(names(gene_pos_tail_temp), fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+ gene_neg_tail_list = bitr(names(gene_neg_tail_temp), fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+
+ key_pos = paste0("C",i,"_p")
+ key_neg = paste0("C",i,"_n")
+ gcSample_pos[[ key_pos ]] <- gene_pos_tail_list$ENTREZID
+ gcSample_neg[[ key_pos ]] <- gene_neg_tail_list$ENTREZID
+}
+
+ck_pos <- compareCluster(geneCluster = gcSample_pos, fun = "enrichKEGG")
+ck_neg <- compareCluster(geneCluster = gcSample_neg, fun = "enrichKEGG")
+cGO_pos <- compareCluster(geneCluster = gcSample_pos, fun = "enrichGO", OrgDb = org.Hs.eg.db)
+cDO_pos <- compareCluster(geneCluster = gcSample_pos, fun = "enrichDO")
+cGO_neg <- compareCluster(geneCluster = gcSample_neg, fun = "enrichGO", OrgDb = org.Hs.eg.db)
+cDO_neg <- compareCluster(geneCluster = gcSample_neg, fun = "enrichDO")
+
+dotplot(cGO_pos,font.size=32, title="GO overrepresentation for the drivers of the positive tail")
+cat('\n\n')
+dotplot(cGO_neg,font.size=32, title="GO overrepresentation for the drivers of the negative tail")
+cat('\n\n')
+dotplot(ck_pos,font.size=32, title="KEGG overrepresentation for the drivers of the positive tail")
+cat('\n\n')
+dotplot(ck_neg,font.size=32, title="KEGG overrepresentation for the drivers of the negative tail")
+cat('\n\n')
+dotplot(cDO_pos,font.size=32, title="DO overrepresentation for the drivers of the positive tail")
+cat('\n\n')
+dotplot(cDO_neg,font.size=32, title="DO overrepresentation for the drivers of the negative tail")
+```
+
+## Gene set enrichment analyses
+Could be removed...
+Do we want MSigDB annotation??? To be defined!
+  
+In this analysis, with used MSigDB catalogues and fgsea R package.
+
+Here you can find, per community, the 10 best (based on Nominal Enrichment Score) significantly enriched pathways (for those having at least one significant pathway)
+
+```{r table_community_gsea, echo=FALSE}
+datatable(community_best_pathways[,-c(4,6,8)])
+```

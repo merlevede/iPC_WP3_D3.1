@@ -1,0 +1,270 @@
+---
+title: "Markov Clustering and weighted metagene construction"
+author: "Jane Merlevede & Andrei Zinovyev"
+date: "`r format(Sys.time(), '%m/%d/%y')`" #"02/15/2021"
+output:
+  bookdown::html_document2:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: true
+    toc_depth: 4
+    number_sections: true  
+    df_print: paged
+---
+
+
+```{r variable_definition, echo=FALSE}
+# Options to be defined by the user
+tumor_type="ES"
+nb_comp_per_community = 3
+```
+
+```{r file_loading, echo=FALSE} 
+# input files to provide
+adjacency = read.csv(paste0("../RBH/",tumor_type,"/RBH_",tumor_type,".csv")) #results from RBH analysis
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r package_loading, echo=FALSE, message = FALSE}
+library("stringr")
+library("MCL")
+```
+
+
+# Introduction
+
+We described here the analyses performed on `r tumor_type` gene expression datasets. Our goal is to identify robust (across different datasets) mechanims active in `r tumor_type` tumors.
+
+This report described in details the step 3 of our workflow, the way we used to identify communities and to build weighted metagenes. 
+
+The inputs needed to perform these tasks are:
+
+* correlations obtained from RBH analyses
+* metagenes computed on each dataset
+
+The output are:
+
+* a file listing all the components of each community
+* the weighted metagenes, a matrix with nb rows = union of the genes in all datasets and nb columns = nb of communities
+
+
+This work is in the scope of D3.1 iPC deliverable.
+
+Here we focused on Ewing sarcoma, for which we gathered 20 datasets: 
+
+* 5 bulk datasets of patients
+* 4 single cell cell lines
+* 8 single cell PDX
+* 3 single cell controls (including 2 full embryos GSE137804)
+
+
+# Communities detection
+We want to identify processes that are found across several datasets, making them quite robust. Processes identified in one dataset only may be technical artefact, even if we cannot exclude that they are real rare signal, found in a particular cohort.
+The idea is that a process will be identified by several components in the different datasets and they will form a group, called here a community.
+
+We used Markov Clustering algorithm to detect the communities.
+This is applied to an adjacency matrix, a symmetric matrix giving the correlations (best reciprocal correlation) found between the components.
+
+## Compute an adjacency matrix
+```{r buil_sym_adjacency_matrix, echo=FALSE, message = FALSE}
+#clean component names 
+adjacency$first=sub(" ", "_metagene.", adjacency$source)
+adjacency$second=sub(" ", "_metagene.", adjacency$target)
+
+##how many comp were extracted from all datasets?
+##perform also the union of all genes to build the weighted metagenes
+list_files=list.files(paste0("../sICA/sICA_results/",tumor_type), recursive=FALSE, include.dirs = FALSE)
+
+#correspondance between file name and dataset name used in RBH
+data_infos=read.table("../data/datasets_info", sep="\t", header=TRUE)
+tumor=subset(data_infos, Tumor_type==tumor_type)
+ctrl=subset(data_infos, Tumor_type=="Ctrl")
+data_infos=rbind(tumor, ctrl)
+
+ncomp_total=0
+gene_names=""
+all_comp_names=""
+for (i in 1:length(list_files)) 
+{
+  input_file=read.csv(paste0("../sICA/sICA_results/",tumor_type,"/",list_files[i],"/Metagenes.csv") )
+  ncomp=ncol(input_file)-1
+  ncomp_total=ncomp+ncomp_total
+  ind_info = which( list_files[i]==data_infos$File_name )
+  new_name=data_infos$Acronym[ind_info]
+  comp_names=paste(new_name, colnames(input_file[-1]), sep="_")
+  all_comp_names=c(all_comp_names,comp_names)
+  gene_names=union(gene_names,input_file$X)
+}  
+
+all_comp_names=all_comp_names[-1]
+all_comp_names=gsub("_S_","_",all_comp_names)
+gene_names=gene_names[-1]
+gene_names=sort(gene_names)
+
+
+#Fill the adjacency matrix
+adjacency_matrix=matrix(0,nrow=ncomp_total, ncol=ncomp_total)
+rownames(adjacency_matrix)=all_comp_names
+colnames(adjacency_matrix)=all_comp_names
+for (i in 1:nrow(adjacency))
+{
+  ind_first = which(rownames(adjacency_matrix) == adjacency$first[i])
+  ind_second = which(colnames(adjacency_matrix) == adjacency$second[i])
+  adjacency_matrix[ind_first,ind_second]=adjacency$weight[i]
+  adjacency_matrix[ind_second,ind_first]=adjacency$weight[i]  
+} 
+
+#isSymmetric(adjacency_matrix)
+#length(which(adjacency_matrix != 0))
+```
+
+## Markov Clustering
+
+```{r mcl, echo=FALSE, message = FALSE}
+communities=mcl(x = adjacency_matrix, addLoops = TRUE,allow1 = TRUE)
+
+###order the communities per decreasing number of components
+mapping_list <- as.list(seq_len(length(unique(communities$Cluster))))
+names(mapping_list) <- names(sort(table(communities$Cluster), decreasing = TRUE))
+communities$Cluster <- as.vector(unlist(mapping_list[as.character(communities$Cluster)]))
+
+barplot(table(communities$Cluster),main=paste0("Size of communities of the adjacency matrix\n of the RBH graph obtained from ",tumor_type," datasets"), xlab="Clusters",ylab="Size")
+```
+
+Using  Markov Clustering, `r communities$K` communities are identified. Most of them contain a single component.
+
+We can have a look at the distribution of the size (=nb of components) of the communities.
+
+Then, we kept only communities containing at least `r nb_comp_per_community` components.
+
+## Robust communities
+
+We here considered communities containing at least `r nb_comp_per_community` components, and defined them as robust communities.
+
+```{r mcl_results, echo=FALSE, message = FALSE}
+#=======================================================
+#Build a list of the components belonging to a community
+Community <- vector(mode = "list", length = length(mapping_list))
+for (i in 1:length(mapping_list))
+{
+  ind_C=which(communities$Cluster==i)
+  Community[[i]]=rownames(adjacency_matrix)[ind_C]
+}
+
+#Remove communities of <3 components
+Community_list <- list()
+for (i in 1:length(mapping_list))
+{
+  if ( length(Community[[i]])>=nb_comp_per_community ) 
+  {
+    Community_list[[i]]=Community[[i]]
+  }
+}
+
+community_description=t(sapply(Community_list, "length<-", max(lengths(Community_list))) )
+colnames(community_description)=paste0("Comp",1:ncol(community_description))
+#write.table(community_description, paste0(tumor_type,"_communities"), quote=FALSE, sep="\t", row.names = FALSE)
+
+
+#Check if there are 3 different datasets at least
+# keep_ind=-1
+# for (i in 1:nrow(community_description))
+# {
+#   names=community_description[i,]
+#   temp= unlist(str_split(names,"_metagene"))
+#   names=temp[seq(1,length(temp), by=2)]
+#   if (length(unique(names)) <3)
+#   {
+#     keep_ind=c(keep_ind,i)
+#   }
+# }
+# 
+# if (keep_ind==-1)
+# {
+#   print("warning, ") !!!
+# }
+# 
+# if (keep_ind>-1)
+# {
+#   Community_list=Community_list[[-keep_ind]]
+# }
+```
+
+`r length(Community_list)` communities with `r nb_comp_per_community` components are identified.
+
+# Build "weigthed metagenes"
+
+"weigthed metagenes" characterizing the communities: a matrix with genes in row and nb of communities in columns
+The weight for a gene is the average of its (positive or negative) weigths (depending on the orientation of the heavy tail) in the components belonging to the community
+
+```{r weigthed_metagenes, echo=FALSE, message = FALSE}
+# weighted_metagenes=matrix(0,nrow=length(gene_names), ncol=length(Community_list))
+# for ( i in 1:length(Community_list))
+# {
+#   #Read the S files of the components of the current community
+#   print(paste0("community ",i))
+#   nb_files=length(Community_list[[i]])
+#   new_metagenes=matrix(data=NA,nrow=length(gene_names), ncol=nb_files)
+#   new_metagenes_oriented=matrix(data=NA,nrow=length(gene_names), ncol=nb_files)
+#   rownames(new_metagenes)=gene_names
+#   for (k in 1:nb_files)
+#   {
+#     file_names=unlist(str_split(as.character(Community_list[[i]]),"_metagene.",n=2))[(2*k)-1]
+#     #make the names correspond between acronyme and folder names in sICA results
+#     ind_info_to_retrieve = which( file_names==data_infos$Acronym )
+#     new_name_to_search=data_infos$File_name[ind_info_to_retrieve]
+#     file=read.csv(paste0("../sICA/sICA_results/",tumor_type,"/",new_name_to_search,"/Metagenes.csv"),header=TRUE) #, row.names=1
+#     #check duplicated gene names
+#     genes <- make.unique(as.character(file$X))
+#     genes=na.omit(genes)
+#     #check empty names...
+#     if (length(which(genes==""))>0 )
+#     {
+#       ind_blank=which(genes=="")
+#       genes=genes[-ind_blank]
+#       file=file[-ind_blank,]
+#     }
+#     file$X = genes
+#     #order each file by its gene names
+#     ind_file_gene_names=order(file$X)
+#     file=file[ind_file_gene_names,]    
+#     print(dim(file))
+#     #identify which component to take
+#     IC_names=unlist(str_split(as.character(Community_list[[i]]),"_metagene.",n=2))[2*k]
+#     which_metagene=which(colnames(file)==paste0("metagene.",IC_names))
+#     #identify which genes are in this particular dataset
+#     #ind_genes=which(file$GENE %in% rownames(new_metagenes))
+#     ind_genes=which(rownames(new_metagenes) %in% file$X)    
+#     #Reports the weights of the genes present in this dataset
+#     new_metagenes[ind_genes,k]=file[,which_metagene]
+#   }
+#   #setdiff(new_metagenes[ind_genes,k], file$X)
+#   
+#   #now oriente the components using correlations between metagenes  
+#   #Save each new "weighted metagene"
+#   Cor=cor(new_metagenes,use="pairwise.complete.obs") #try with pairwise.complete.obs, everything, complete.obs
+#   new_metagenes_oriented=new_metagenes
+#   
+#   #orient the components (in such a way that a minimum nb of comp will be changed)
+#   if ( length(which(Cor[,1]>0)) >= length(which(Cor[,1]<0)) )
+#   {
+#     ind_neg_corr=which(Cor[,1]<0)
+#     new_metagenes_oriented[,ind_neg_corr]=-new_metagenes[,ind_neg_corr]
+#   } else {
+#     ind_pos_corr=which(Cor[,1]>0)
+#     new_metagenes_oriented[,ind_pos_corr]=-new_metagenes[,ind_pos_corr]
+#   }
+#   
+#   #Take the average of all the metagenes from a community to build its weighted metagenes
+#   weighted_metagenes[,i]=rowMeans(new_metagenes_oriented, na.rm=TRUE) #na.rm
+# }
+# 
+# rownames(weighted_metagenes)=gene_names
+# colnames(weighted_metagenes)=paste0("C",1:length(Community_list))
+# write.table(weighted_metagenes,paste0(tumor_type,"weighted_metagenes_"),sep="\t", quote=FALSE)
+```
+
