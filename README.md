@@ -7,9 +7,11 @@ We advise the readers to start by reading the methods, then look at the example 
 
 # Methods
 
-The analysis of the collected datasets consisted in 4 steps, from decomposing a single dataset to interpreting signals found across many datasets. The workflow below summarizes the different steps and some details are given in the following sections. The approach applied here was already used in the study by Cantini et al. 2019: Assessing reproducibility of matrix factorization methods in independent transcriptomes.
+The analysis of the collected datasets consisted in 4 steps, from decomposing a single dataset to interpreting signals found across many datasets. The workflow (#workflow) below summarizes the different steps and some details are given in the following sections. The approach applied here was already used in the study by Cantini et al. 2019: Assessing reproducibility of matrix factorization methods in independent transcriptomes.
 
 ![Alt text](./docs/images/cantini_2019_fig1.pdf?raw=true "Workflow of the analysis performed to identify robust communities, adapted from Cantini et al.")
+
+[![workflow](https://github.com/merlevede/iPC_WP3_D3.1/blob/master/docs/images/cantini_2019_fig1.pdf)](#workflow)
 
 Steps 1 and 2 were performed using an implementation in python of Stabilized ICA developped by Nicolas Captier, a member of Andrei Zinovyev team: https://github.com/ncaptier/Stabilized_ICA. We adapted this notebook to the needs of iPC project. 
 
