@@ -1,7 +1,7 @@
 ---
 title: "Deconvolution of gene expression Ewing Sarcoma datasets"
 author: "Jane Merlevede & Andrei Zinovyev"
-date: "`r format(Sys.time(), '%m/%d/%y')`" #"02/15/2021"
+date: "`r format(Sys.time(), '%m/%d/%y')`"  
 output:
   bookdown::html_document2:
     toc: true

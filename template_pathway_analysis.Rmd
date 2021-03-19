@@ -8,7 +8,9 @@ names(geneList) <- rownames(weighted_metagenes)
 
 ## feature 3: decreasing order
 geneList <- sort(geneList, decreasing = TRUE)
-data(geneList, package="DOSE")
+#data(geneList, package="DOSE")
+geneList_conversion = bitr(names(geneList), fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+names(geneList) <- geneList_conversion$ENTREZID
 
 #define driver genes
 ind_pos_tail_3SD=which(weighted_metagenes[,i]>Mean[i]+3*SD[i])
@@ -37,9 +39,10 @@ Let us take a look at the results of the enrichments of the drivers of the posit
 
 ```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
 #GO
-ego_pos <- enrichGO(gene      = gene_pos_tail_list$ENTREZID,
+  ego_pos <- enrichGO(gene      = gene_pos_tail_list$ENTREZID,
                     universe      = names(geneList),
                     OrgDb         = org.Hs.eg.db,
+                    #keyType = "SYMBOL",
                     ont           = "ALL",
                     pAdjustMethod = "BH",
                     pvalueCutoff  = 0.01,
@@ -49,6 +52,7 @@ ego_pos <- enrichGO(gene      = gene_pos_tail_list$ENTREZID,
 ego_neg <- enrichGO(gene      = gene_neg_tail_list$ENTREZID,
                     universe      = names(geneList),
                     OrgDb         = org.Hs.eg.db,
+                    #keyType = "SYMBOL",
                     ont           = "ALL",
                     pAdjustMethod = "BH",
                     pvalueCutoff  = 0.01,
@@ -99,6 +103,7 @@ if (nrow(ego_pos) > 0 & nrow(ego_neg) == 0 )
 
 ego_gse <- gseGO(geneList     = geneList,
               OrgDb        = org.Hs.eg.db,
+              #keyType = "SYMBOL",
               ont          = "ALL",
               nPerm        = nPerm, 
               minGSSize    = 10,
