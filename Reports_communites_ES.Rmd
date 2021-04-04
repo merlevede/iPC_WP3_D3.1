@@ -12,7 +12,7 @@ output:
     number_sections: true  
     df_print: paged
 ---
-
+  
 
 ```{r variable_definition, echo=FALSE}
 #Options to be defined by the user
@@ -23,10 +23,9 @@ top_driver_genes=5 #Nb of top driver genes to show in table
 
 ```{r file_loading, echo=FALSE} 
 #input files to provide
-weighted_metagenes = read.table(paste0(tumor_type,"_weighted_metagenes"), header = TRUE, sep="\t") #weighted metagenes previously computed
+weighted_metagenes = read.table(paste0(tumor_type,"_weighted_metagenes"), header = TRUE, sep="\t") #weighted metagenes computed in mcl_and_weighted_metagenes.R
 datasets_info = read.table("../datasets_info", header = TRUE, sep="\t", as.is=TRUE) #info about the datasets
-community_comp = read.table(paste0(tumor_type,"_communities"), header = TRUE, sep="\t") #first impl
-community_best_pathways = read.table(paste0(tumor_type,"_best_pathways"), header = TRUE, sep="\t") #second impl
+community_comp = read.table(paste0(tumor_type,"_communities"), header = TRUE, sep="\t") #obtained from mcl_and_weighted_metagenes.R
 ```
 
 ```{r setup, include=FALSE}
@@ -37,6 +36,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library("stringr")
 library("knitr")
 library("clusterProfiler")
+library(GOSemSim)
+library("enrichplot")
 library("vroom")
 library("DOSE")
 library("ggplot2")
@@ -142,7 +143,7 @@ if (file.exists(fn,showWarnings = FALSE)) {
   #Delete file if it exists
   file.remove(fn)
 }
-
+  
 for (k in 1:ncol(weighted_metagenes))
 {
   ind_pos_tail_3SD=which(weighted_metagenes[,k]>Mean[k]+3*SD[k])
@@ -170,10 +171,10 @@ for (i in 1:nrow(community_comp))
   table_top_drivers$Driver_pos_tail[i] = paste0(community_pos$genes[1:top_driver_genes], collapse=";")
   table_top_drivers$Driver_neg_tail[i] = paste0(community_neg$genes[1:top_driver_genes], collapse=";")
 }
-datatable(table_top_drivers)
+datatable(table_top_drivers, rownames=FALSE)
 ```
 
-# Annotation of the communities
+# Annotation of the communities using GO, KEGG, MSigDB and DO
 
 To decipher the mechnanisms active in the communities, we extracted the driver genes in each community and performed over representation analysis as well as gene set enrichment analyses using MSigDB (http://www.gsea-msigdb.org/gsea/msigdb/collections.jsp) on each community.
 
@@ -186,12 +187,19 @@ gcSample_pos = list()
 gcSample_neg = list()
 Mean=colMeans(weighted_metagenes, na.rm = TRUE)
 SD=apply(weighted_metagenes,2,sd, na.rm = TRUE)
+
+folder_MSigDB_gene_sets = "gene_sets/MSigDB/"
+gene_sets = list.files(folder_MSigDB_gene_sets, full.names = TRUE)
+egmt_pos_combine=data.frame(matrix(nrow=0,ncol=10))
+egmt_neg_combine=data.frame(matrix(nrow=0,ncol=10))
+d <- godata('org.Hs.eg.db', ont="BP")
+  
 out <- NULL
 
-for (i in 1:nrow(community_comp)) #nrow(community_comp) 
+for (i in 1:nrow(community_comp)) #nrow(community_comp)
 {
   out <- c(out, knit_child('template_pathway_analysis.Rmd', quiet = TRUE))
-}
+} 
 ```
 
 `r paste(out, collapse='\n')`
@@ -207,7 +215,7 @@ gcSample_pos = list()
 gcSample_neg = list()
 Mean=colMeans(weighted_metagenes, na.rm = TRUE)
 SD=apply(weighted_metagenes,2,sd, na.rm = TRUE)
-for (i in 1:nrow(community_comp))
+for (i in 1:nrow(community_comp)) #nrow(community_comp)
 {
  ## feature 1: numeric vector
  geneList <- weighted_metagenes[,i]
@@ -216,13 +224,13 @@ for (i in 1:nrow(community_comp))
 
  ## feature 3: decreasing order
  geneList <- sort(geneList, decreasing = TRUE)
- data(geneList, package="DOSE")
+ #data(geneList, package="DOSE")
 
  #define driver genes
  ind_pos_tail_3SD=which(weighted_metagenes[,i]>Mean[i]+3*SD[i])
  ind_neg_tail_3SD=which(weighted_metagenes[,i]<Mean[i]-3*SD[i])
- genes_pos_tail= rownames(weighted_metagenes[ind_pos_tail_3SD,i])
- genes_neg_tail= rownames(weighted_metagenes[ind_neg_tail_3SD,i])
+ genes_pos_tail= rownames(weighted_metagenes[ind_pos_tail_3SD,])
+ genes_neg_tail= rownames(weighted_metagenes[ind_neg_tail_3SD,])
  genes=c(genes_pos_tail, genes_neg_tail)
 
  gene_pos_tail = weighted_metagenes[ind_pos_tail_3SD,i]
@@ -260,14 +268,75 @@ cat('\n\n')
 dotplot(cDO_neg,font.size=32, title="DO overrepresentation for the drivers of the negative tail")
 ```
 
-## Gene set enrichment analyses
-Could be removed...
-Do we want MSigDB annotation??? To be defined!
-  
-In this analysis, with used MSigDB catalogues and fgsea R package.
 
-Here you can find, per community, the 10 best (based on Nominal Enrichment Score) significantly enriched pathways (for those having at least one significant pathway)
+# Annotation of the communities using gene sets of transcription factors
+We used Dorothea database (Discriminant Regulon Expression Analysis, https://saezlab.github.io/dorothea/, Garcia-Alonso L et al. 2019) to construct gene sets of each of the reported transcription factor. We then checked if the communities were enriched in some of these TF gene sets.
 
-```{r table_community_gsea, echo=FALSE}
-datatable(community_best_pathways[,-c(4,6,8)])
+For that, we performed over representation analysis of the drivers of the positive and negative tails of each community using the TF gene sets.
+
+
+```{r communities_OR_TF_gene_sets, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+
+TF = "gene_sets/TF_targets_dorothea_hs.gmt"
+TFgs <- read.gmt(TF)
+egmt_pos_combine=data.frame(matrix(nrow=0,ncol=10))
+egmt_neg_combine=data.frame(matrix(nrow=0,ncol=10))
+
+out_TFgs <- NULL
+
+for (i in 1:nrow(community_comp) ) 
+{
+  out_TFgs <- c(out_TFgs, knit_child('template_enrichment_in_TF_genesets.Rmd', quiet = TRUE))
+}
 ```
+
+`r paste(out_TFgs, collapse='\n')`
+
+```{r communities_OR_TF_gene_sets_datatable, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+datatable(egmt_pos_combine_reordered, rownames = FALSE)
+datatable(egmt_neg_combine_reordered, rownames = FALSE)
+```
+
+For each community, a total of `r length(unique(TFgs$term))` gene sets are tested. 
+
+There are a total of `r nrow(egmt_pos_combine_reordered)` significant enrichments in positive tails and `r nrow(egmt_neg_combine_reordered)` significant enrichment in negative tails.
+
+There are `r length(unique(egmt_pos_combine_reordered$ID))`  unique TFs with significant enrichments in their targets in the drivers of the positive tails and `r length(unique(egmt_neg_combine_reordered$ID))` unique TFs with significant enrichments in their targers in the drivers of the negative tails.
+
+
+
+# Annotation of the communities using user defined gene sets
+
+Now we want to check if the detected communities are enriched in specific gene sets. Here we used the gene sets identified in the work of Aynaud et al. 2019, where single cells ES data were investiguated using ICA. Also, additional gene sets are used.
+
+For that, we performed over representation analysis of the drivers of the positive and negative tails of each community using the defined gene sets.
+
+```{r communities_OR_personnalized_gene_sets, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+
+specific_gene_sets = "gene_sets/ics_and_signatures.gmt"
+sgs <- read.gmt(specific_gene_sets)
+egmt_pos_combine=data.frame(matrix(nrow=0,ncol=10))
+egmt_neg_combine=data.frame(matrix(nrow=0,ncol=10))
+
+out_sgs <- NULL
+
+for (i in 1:nrow(community_comp) ) 
+{
+  out_sgs <- c(out_sgs, knit_child('template_enrichment_in_specific_genesets.Rmd', quiet = TRUE))
+}
+```
+
+`r paste(out_sgs, collapse='\n')`
+
+```{r communities_OR_personnalized_gene_sets_datatable, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+datatable(egmt_pos_combine_reordered, rownames = FALSE)
+datatable(egmt_neg_combine_reordered, rownames = FALSE)
+```
+
+For each community, a total of `r length(unique(sgs$term))` gene sets are tested. 
+
+There are a total of `r nrow(egmt_pos_combine_reordered)` significant enrichments in positive tails and `r nrow(egmt_neg_combine_reordered)` significant enrichment in negative tails.
+
+`r length(grep("^IC",egmt_pos_combine_reordered$ID))` IC are retrieved in positive tails and `r length(grep("^IC",egmt_neg_combine_reordered$ID))` IC are retrieved in negative tails.
+
+`r length(unique(grep("^IC",egmt_pos_combine_reordered$ID)))` IC are retrieved in positive tails and `r length(unique(grep("^IC",egmt_neg_combine_reordered$ID)))` IC are retrieved in negative tails.

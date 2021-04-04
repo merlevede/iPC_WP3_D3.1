@@ -1,0 +1,54 @@
+
+
+```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+## feature 1: numeric vector
+geneList <- weighted_metagenes[,i]
+## feature 2: named vector
+names(geneList) <- rownames(weighted_metagenes)
+
+## feature 3: decreasing order
+geneList <- sort(geneList, decreasing = TRUE)
+geneList_HUGO = geneList
+#data(geneList, package="DOSE")
+geneList_conversion = bitr(names(geneList), fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+names(geneList) <- geneList_conversion$ENTREZID
+names(geneList_HUGO) <- geneList_conversion$SYMBOL
+
+#define driver genes
+ind_pos_tail_3SD=which(weighted_metagenes[,i]>Mean[i]+3*SD[i])
+ind_neg_tail_3SD=which(weighted_metagenes[,i]<Mean[i]-3*SD[i])
+gene_pos_tail = weighted_metagenes[ind_pos_tail_3SD,i]
+gene_neg_tail = weighted_metagenes[ind_neg_tail_3SD,i]
+names(gene_pos_tail) = rownames(weighted_metagenes[ind_pos_tail_3SD,])
+names(gene_neg_tail) = rownames(weighted_metagenes[ind_neg_tail_3SD,])
+genes=c(gene_pos_tail, gene_neg_tail)
+gene_pos_tail_temp = sort(gene_pos_tail, decreasing = TRUE)
+gene_neg_tail_temp = sort(gene_neg_tail, decreasing = TRUE)
+gene_pos_tail_list = bitr(names(gene_pos_tail_temp), fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+gene_neg_tail_list = bitr(names(gene_neg_tail_temp), fromType="SYMBOL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
+
+e_TFgmt_pos <- enricher(gene_pos_tail_list$SYMBOL, TERM2GENE=TFgs, pvalueCutoff = 0.01, pAdjustMethod = "BH", universe=names(geneList_HUGO), minGSSize = 10, maxGSSize = 900, qvalueCutoff = 0.01)
+e_TFgmt_neg <- enricher(gene_neg_tail_list$SYMBOL, TERM2GENE=TFgs, pvalueCutoff = 0.01, pAdjustMethod = "BH", universe=names(geneList_HUGO), minGSSize = 10, maxGSSize = 900, qvalueCutoff = 0.01)
+if ( nrow(e_TFgmt_pos)>0 )
+{
+  egmt_pos = as.data.frame(e_TFgmt_pos)
+  egmt_pos$Community=paste0("C",i)
+  egmt_pos_combine=rbind(egmt_pos_combine,egmt_pos)
+}
+
+if ( nrow(e_TFgmt_neg)>0 )
+{
+  egmt_neg = as.data.frame(e_TFgmt_neg)
+  egmt_neg$Community=paste0("C",i)
+  egmt_neg_combine=rbind(egmt_neg_combine,egmt_neg)
+}
+
+egmt_pos_combine_reordered = egmt_pos_combine[,c(10,1:9)]
+egmt_neg_combine_reordered = egmt_neg_combine[,c(10,1:9)]
+```
+
+<br><br><br>
