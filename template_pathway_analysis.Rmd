@@ -15,7 +15,7 @@ names(geneList) <- geneList_conversion$ENTREZID
 names(geneList_HUGO) <- geneList_conversion$SYMBOL
 
 
-#define driver genes
+#define top-contributing genes
 ind_pos_tail_3SD=which(weighted_metagenes[,i]>Mean[i]+3*SD[i])
 ind_neg_tail_3SD=which(weighted_metagenes[,i]<Mean[i]-3*SD[i])
 gene_pos_tail = weighted_metagenes[ind_pos_tail_3SD,i]
@@ -38,7 +38,7 @@ gene_neg_tail_list = bitr(names(gene_neg_tail_temp), fromType="SYMBOL", toType="
 ### `r paste0("Community ",i)`
 
 #### `r paste0("GO enrichment for community ",i)`
-Let us take a look at the results of the enrichments of the drivers of the positive and negative tails based on Gene Ontology.
+Let us take a look at the results of the enrichments of the top-contributing genes of the positive and negative tails based on Gene Ontology.
 
 ```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
 #GO
@@ -63,48 +63,48 @@ ego_neg <- enrichGO(gene      = gene_neg_tail_list$ENTREZID,
                     qvalueCutoff  = 0.01,
                     readable      = TRUE)
 
-datatable(data.frame(ego_pos), rownames=FALSE, caption=paste0("\n\n\nGO overexpression analysis for drivers (pos tail) in community ",i) ) 
-datatable(data.frame(ego_neg), rownames=FALSE, caption=paste0("\n\n\nGO overexpression analysis for drivers (neg tail) in community ",i)) 
+datatable(data.frame(ego_pos), rownames=FALSE, caption=paste0("\n\n\nGO overexpression analysis for top-contributing genes (pos tail) in community ",i) ) 
+datatable(data.frame(ego_neg), rownames=FALSE, caption=paste0("\n\n\nGO overexpression analysis for top-contributing genes (neg tail) in community ",i)) 
 
 if (nrow(ego_pos) > 0 & nrow(ego_neg) == 0 )
 {
-  go1_d <- dotplot(ego_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot of the drivers (pos tail) in community ",i))
+  go1_d <- dotplot(ego_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot of the top-contributing genes (pos tail) in community ",i))
   print(plot_grid(go1_d, ncol=1)) 
   if (nrow(ego_pos) > 1)
   {
     ego_pos2 <- pairwise_termsim(ego_pos, method="Wang", semData = d)
-    go1_e <- emapplot(ego_pos2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot of the drivers (pos tail) in community ",i))
+    go1_e <- emapplot(ego_pos2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot of the top-contributing genes (pos tail) in community ",i))
     print(plot_grid(go1_e, ncol=1)) #, labels=LETTERS[1:4]
   }
-  go1_c <- cnetplot(ego_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the drivers (pos tail) in community ",i))
+  go1_c <- cnetplot(ego_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the top-contributing genes (pos tail) in community ",i))
   print(plot_grid(go1_c, ncol=1)) #, labels=LETTERS[1:4]
 } else if(nrow(ego_pos) == 0 & nrow(ego_neg) > 0 )
 {
-  go2_d <- dotplot(ego_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot of the drivers drivers (neg tail) in community ",i))
+  go2_d <- dotplot(ego_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot of the top-contributing genes (neg tail) in community ",i))
   print(plot_grid(go2_d, ncol=1)) 
   if (nrow(ego_neg) > 1)
   {
     ego_neg2 <- pairwise_termsim(ego_neg, method="Wang", semData = d)
-    go2_e <- emapplot(ego_neg2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot of the drivers (neg tail) in community ",i))
+    go2_e <- emapplot(ego_neg2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot of the top-contributing genes (neg tail) in community ",i))
     print(plot_grid(go2_e, ncol=1)) #, labels=LETTERS[1:4]  
   }
-  go2_c <- cnetplot(ego_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the drivers (neg tail) in community ",i))
+  go2_c <- cnetplot(ego_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the top-contributing genes (neg tail) in community ",i))
   print(plot_grid(go2_c, ncol=1)) #, labels=LETTERS[1:4]
 } else if (nrow(ego_pos) > 0 & nrow(ego_neg) > 0 )
 {
-  go1_d <- dotplot(ego_pos, showCategory=20, x = "GeneRatio") + ggtitle(paste0("\n\n\ndotplot of the drivers drivers (pos tail) in community ",i))
-  go2_d <- dotplot(ego_neg, showCategory=20, x = "GeneRatio") + ggtitle(paste0("\n\n\ndotplot of the drivers drivers (neg tail) in community ",i))
+  go1_d <- dotplot(ego_pos, showCategory=20, x = "GeneRatio") + ggtitle(paste0("\n\n\ndotplot of the top-contributing genes (pos tail) in community ",i))
+  go2_d <- dotplot(ego_neg, showCategory=20, x = "GeneRatio") + ggtitle(paste0("\n\n\ndotplot of the top-contributing genes (neg tail) in community ",i))
   print(plot_grid(go1_d,go2_d, ncol=2)) 
   if (nrow(ego_pos) > 1 & nrow(ego_neg) > 1 )
   {
     ego_pos2 <- pairwise_termsim(ego_pos, method="Wang", semData = d)
     ego_neg2 <- pairwise_termsim(ego_neg, method="Wang", semData = d)
-    go1_e <- emapplot(ego_pos2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot of the  drivers (pos tail) in community ",i))
-    go2_e <- emapplot(ego_neg2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot of the  drivers (neg tail) in community ",i))
+    go1_e <- emapplot(ego_pos2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot of the  top-contributing genes (pos tail) in community ",i))
+    go2_e <- emapplot(ego_neg2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot of the  top-contributing genes (neg tail) in community ",i))
     print(plot_grid(go1_e, go2_e, ncol=2)) #, labels=LETTERS[1:4]
   }
-  go1_c <- cnetplot(ego_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the drivers (pos tail) in community ",i))
-  go2_c <- cnetplot(ego_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the drivers (neg tail) in community ",i))
+  go1_c <- cnetplot(ego_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the top-contributing genes (pos tail) in community ",i))
+  go2_c <- cnetplot(ego_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot of the top-contributing genes (neg tail) in community ",i))
   print(plot_grid(go1_c, go2_c, ncol=2)) #, labels=LETTERS[1:4]
 }
 
@@ -130,17 +130,17 @@ ego_gse_neg=ego_gse[which(ego_gse$NES<=-2),]
 ind_order_neg=order(ego_gse_neg$NES, decreasing=FALSE)
 ego_gse_neg=ego_gse_neg[ind_order_neg,]
 
-datatable(data.frame(ego_gse_pos), rownames=FALSE, caption=paste0("\n\n\nGO gsea for drivers (pos tail) in community ",i))
-datatable(data.frame(ego_gse_neg), rownames=FALSE, caption=paste0("\n\n\nGO gsea for drivers (neg tail) in community ",i))
+datatable(data.frame(ego_gse_pos), rownames=FALSE, caption=paste0("\n\n\nGO gsea for top-contributing genes (pos tail) in community ",i))
+datatable(data.frame(ego_gse_neg), rownames=FALSE, caption=paste0("\n\n\nGO gsea for top-contributing genes (neg tail) in community ",i))
 
-#go_gsea <- dotplot(ego_gse, showCategory=20) + ggtitle(paste0("GO - drivers (pos tail) in community ",i))
+#go_gsea <- dotplot(ego_gse, showCategory=20) + ggtitle(paste0("GO - top-contributing genes (pos tail) in community ",i))
 #print(plot_grid(go_gsea, ncol=1)) 
 ```
 
 <br><br>
 
 #### `r paste0("KEGG enrichment for community ",i)`
-Let us now take a look at the results of the enrichments of the drivers of the positive and negative tails based on KEGG.
+Let us now take a look at the results of the enrichments of the top-contributing genes of the positive and negative tails based on KEGG.
 
 ```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
 #KEGG
@@ -155,43 +155,43 @@ ek_neg <- enrichKEGG(gene = gene_neg_tail_list$ENTREZID,
 ek_pos <- setReadable(ek_pos, 'org.Hs.eg.db','ENTREZID')
 ek_neg <- setReadable(ek_neg, 'org.Hs.eg.db', 'ENTREZID')
 
-DT::datatable(data.frame(ek_pos), rownames=FALSE, caption=paste0("\n\n\nKEGG overexpression analysis for drivers (pos tail) in community ",i))
-DT::datatable(data.frame(ek_neg), rownames=FALSE, caption=paste0("\n\n\nKEGG overexpression analysis for drivers (neg tail) in community ",i))
+DT::datatable(data.frame(ek_pos), rownames=FALSE, caption=paste0("\n\n\nKEGG overexpression analysis for top-contributing genes (pos tail) in community ",i))
+DT::datatable(data.frame(ek_neg), rownames=FALSE, caption=paste0("\n\n\nKEGG overexpression analysis for top-contributing genes (neg tail) in community ",i))
 
-ek1_d <- dotplot(ek_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (pos tail) in community ",i))
-ek2_d <- dotplot(ek_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (neg tail) in community ",i))
+ek1_d <- dotplot(ek_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the top-contributing genes (pos tail) in community ",i))
+ek2_d <- dotplot(ek_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the top-contributing genes (neg tail) in community ",i))
 
 if (nrow(ek_pos) > 0 & nrow(ek_neg) == 0 )
 {
   print(plot_grid(ek1_d, ncol=1))
   # if (nrow(ek_pos) > 1)
   # {
-  #   ek1_e <- emapplot(ek_pos, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the drivers (pos tail) in community ",i))
+  #   ek1_e <- emapplot(ek_pos, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the top-contributing genes (pos tail) in community ",i))
   #   print(plot_grid(ek1_e, ncol=1)) #, labels=LETTERS[1:4]
   # }
-  ek1_c <- cnetplot(ek_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (pos tail) in community ",i))
+  ek1_c <- cnetplot(ek_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the top-contributing genes (pos tail) in community ",i))
   print(plot_grid(ek1_c, ncol=1)) #, labels=LETTERS[1:4]
 } else if(nrow(ek_pos) == 0 & nrow(ek_neg) > 0 )
 {
   print(plot_grid(ek2_d, ncol=1))
   # if (nrow(ek_neg) > 1)
   # {
-  #   ek2_e <- emapplot(ek_neg, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the drivers (neg tail) in community ",i))
+  #   ek2_e <- emapplot(ek_neg, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the top-contributing genes (neg tail) in community ",i))
   #   print(plot_grid(ek2_e, ncol=1)) #, labels=LETTERS[1:4]
   # }
-  ek2_c <- cnetplot(ek_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (neg tail) in community ",i))
+  ek2_c <- cnetplot(ek_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the top-contributing genes (neg tail) in community ",i))
   print(plot_grid(ek2_c, ncol=1)) #, labels=LETTERS[1:4]
 } else if (nrow(ek_pos) > 0 & nrow(ek_neg) > 0 )
 {
   print(plot_grid(ek1_d,ek2_d, ncol=2))
    # if (nrow(ek_pos) > 1 & nrow(ek_neg) > 1 )
    # {
-   #    ek1_e <- emapplot(ek_pos, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the drivers (pos tail) in community ",i))
-   #    ek2_e <- emapplot(ek_neg, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the drivers (neg tail) in community ",i))
+   #    ek1_e <- emapplot(ek_pos, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the top-contributing genes (pos tail) in community ",i))
+   #    ek2_e <- emapplot(ek_neg, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the top-contributing genes (neg tail) in community ",i))
    #    print(plot_grid(ek1_e, ek2_e, ncol=2)) #, labels=LETTERS[1:4]
    # }
-  ek1_c <- cnetplot(ek_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (pos tail) in community ",i))
-  ek2_c <- cnetplot(ek_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (neg tail) in community ",i))
+  ek1_c <- cnetplot(ek_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the top-contributing genes (pos tail) in community ",i))
+  ek2_c <- cnetplot(ek_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the top-contributing genes (neg tail) in community ",i))
   print(plot_grid(ek1_c, ek2_c, ncol=2)) #, labels=LETTERS[1:4]
 }
 
@@ -214,8 +214,8 @@ ek_gse_neg=ek_gse[which(ek_gse$NES<=-2),]
 ind_order_neg=order(ek_gse_neg$NES, decreasing=FALSE)
 ek_gse_neg=ek_gse_neg[ind_order_neg,]
 
-datatable(data.frame(ek_gse_pos), rownames=FALSE, caption=paste0("\n\n\nKEGG gsea for drivers (pos tail) in community ",i))
-datatable(data.frame(ek_gse_neg), rownames=FALSE, caption=paste0("\n\n\nKEGG gsea for drivers (neg tail) in community ",i))
+datatable(data.frame(ek_gse_pos), rownames=FALSE, caption=paste0("\n\n\nKEGG gsea for top-contributing genes (pos tail) in community ",i))
+datatable(data.frame(ek_gse_neg), rownames=FALSE, caption=paste0("\n\n\nKEGG gsea for top-contributing genes (neg tail) in community ",i))
 
 ```
 
@@ -223,7 +223,7 @@ datatable(data.frame(ek_gse_neg), rownames=FALSE, caption=paste0("\n\n\nKEGG gse
 <br><br>
 
 #### `r paste0("MSigDB enrichment for community ",i)`
-Let us now take a look at the results of the enrichments of the drivers of the positive and negative tails based on MSigDB catalogues.
+Let us now take a look at the results of the enrichments of the top-contributing genes of the positive and negative tails based on MSigDB catalogues.
 
 
 ```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
@@ -259,7 +259,7 @@ datatable(egmt_neg_combine[,c(10,1:9)], rownames = FALSE)
 <br><br>
 
 #### `r paste0("DO enrichment for community ",i)`
-Finally, let us take a look at the results of the enrichments of the drivers of the positive and negative tails based on Disease Ontology.
+Finally, let us take a look at the results of the enrichments of the top-contributing genes of the positive and negative tails based on Disease Ontology.
 
 ```{r, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
 #DO
@@ -287,48 +287,48 @@ edo_pos <- setReadable(edo_pos, 'org.Hs.eg.db')
 edo_neg <- setReadable(edo_neg, 'org.Hs.eg.db')
 
 
-DT::datatable(data.frame(edo_pos), rownames=FALSE, caption=paste0("\n\n\nDO overexpression analysis for drivers (pos tail) in community ",i))
-DT::datatable(data.frame(edo_neg), rownames=FALSE, caption=paste0("\n\n\nDO overexpression analysis for drivers (neg tail) in community ",i))
+DT::datatable(data.frame(edo_pos), rownames=FALSE, caption=paste0("\n\n\nDO overexpression analysis for top-contributing genes (pos tail) in community ",i))
+DT::datatable(data.frame(edo_neg), rownames=FALSE, caption=paste0("\n\n\nDO overexpression analysis for top-contributing genes (neg tail) in community ",i))
 
 if (nrow(edo_pos) > 0 & nrow(edo_neg) == 0 )
 {
-  do1_d <- dotplot(edo_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (pos tail) in community ",i))
+  do1_d <- dotplot(edo_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the top-contributing genes (pos tail) in community ",i))
   print(plot_grid(do1_d, ncol=1))
   # if (nrow(edo_pos) > 1)
   # {
   #   edo_pos2 <- pairwise_termsim(edo_pos, method="Wang", semData = do)
-  #   do1_e <- emapplot(edo_pos2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the drivers (pos tail) in community ",i))
+  #   do1_e <- emapplot(edo_pos2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the top-contributing genes (pos tail) in community ",i))
   #   print(plot_grid(do1_e, ncol=1)) #, labels=LETTERS[1:4]    
   # }
-  do1_c <- cnetplot(edo_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the  drivers (pos tail) in community ",i))
+  do1_c <- cnetplot(edo_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the  top-contributing genes (pos tail) in community ",i))
   print(plot_grid(do1_c, ncol=1)) #, labels=LETTERS[1:4]
 } else if(nrow(edo_pos) == 0 & nrow(edo_neg) > 0 )
 {
-  do2_d <- dotplot(edo_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (neg tail) in community ",i))
+  do2_d <- dotplot(edo_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the top-contributing genes (neg tail) in community ",i))
   print(plot_grid(do2_d, ncol=1))
   # if (nrow(edo_neg) > 1)
   # {
   #   edo_neg2 <- pairwise_termsim(edo_neg, method="Wang", semData = do)
-  #   do2_e <- emapplot(edo_neg2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the drivers (neg tail) in community ",i))
+  #   do2_e <- emapplot(edo_neg2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the top-contributing genes (neg tail) in community ",i))
   #   print(plot_grid(do2_e, ncol=1)) #, labels=LETTERS[1:4]
   # }
-  do2_c <- cnetplot(edo_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (neg tail) in community ",i))
+  do2_c <- cnetplot(edo_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the top-contributing genes (neg tail) in community ",i))
   print(plot_grid(do2_c, ncol=1)) #, labels=LETTERS[1:4]
 } else if (nrow(edo_pos) > 0 & nrow(edo_neg) > 0 )
 {
-  do1_d <- dotplot(edo_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (pos tail) in community ",i))
-  do2_d <- dotplot(edo_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the drivers (neg tail) in community ",i))
+  do1_d <- dotplot(edo_pos, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the top-contributing genes (pos tail) in community ",i))
+  do2_d <- dotplot(edo_neg, showCategory=20) + ggtitle(paste0("\n\n\ndotplot for the top-contributing genes (neg tail) in community ",i))
   print(plot_grid(do1_d,do2_d, ncol=2))
   # if (nrow(edo_pos) > 1 & nrow(edo_neg) > 1 )
   # {
   #   edo_pos2 <- pairwise_termsim(edo_pos, method="Wang", semData = do)
   #   edo_neg2 <- pairwise_termsim(edo_neg, method="Wang", semData = do)
-  #   do1_e <- emapplot(edo_pos2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the drivers (pos tail) in community ",i))
-  #   do2_e <- emapplot(edo_neg2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the drivers (neg tail) in community ",i))
+  #   do1_e <- emapplot(edo_pos2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the top-contributing genes (pos tail) in community ",i))
+  #   do2_e <- emapplot(edo_neg2, showCategory = 10) + ggtitle(paste0("\n\n\nemapplot for the top-contributing genes (neg tail) in community ",i))
   #   print(plot_grid(do1_e, do2_e, ncol=2)) #, labels=LETTERS[1:4]
   # }
-  do1_c <- cnetplot(edo_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (pos tail) in community ",i))
-  do2_c <- cnetplot(edo_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the drivers (neg tail) in community ",i))
+  do1_c <- cnetplot(edo_pos, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the top-contributing genes (pos tail) in community ",i))
+  do2_c <- cnetplot(edo_neg, foldChange=geneList, node_label="all") + ggtitle(paste0("\n\n\ncnetplot for the top-contributing genes (neg tail) in community ",i))
   print(plot_grid(do1_c, do2_c, ncol=2)) #, labels=LETTERS[1:4]
 }
 
@@ -351,8 +351,8 @@ edo_gse_neg=edo_gse[which(edo_gse$NES<=-2),]
 ind_order_neg=order(edo_gse_neg$NES, decreasing=FALSE)
 edo_gse_neg=edo_gse_neg[ind_order_neg,]
 
-datatable(data.frame(edo_gse_pos), rownames=FALSE, caption=paste0("\n\n\nDO gsea for drivers (pos tail) in community ",i))
-datatable(data.frame(edo_gse_neg), rownames=FALSE, caption=paste0("\n\n\nDO gsea for drivers (neg tail) in community ",i))
+datatable(data.frame(edo_gse_pos), rownames=FALSE, caption=paste0("\n\n\nDO gsea for top-contributing genes (pos tail) in community ",i))
+datatable(data.frame(edo_gse_neg), rownames=FALSE, caption=paste0("\n\n\nDO gsea for top-contributing genes (neg tail) in community ",i))
 ```
 
 

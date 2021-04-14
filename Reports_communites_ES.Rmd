@@ -18,7 +18,7 @@ output:
 #Options to be defined by the user
 tumor_type="ES"
 nPerm=10000 #Nb permutations for gsea
-top_driver_genes=5 #Nb of top top-contributing genes to show in table
+top_top_contributing_genes=5 #Nb of top top-contributing genes to show in table
 ```
 
 ```{r file_loading, echo=FALSE} 
@@ -53,6 +53,7 @@ We described here the analyses performed on `r tumor_type` gene expression datas
 This report described in details the communities identified: their component names, their techno type (bulk or single), their data type (patient, PDX, cell line, controls) and the significantly enriched gene sets. It also briefly describes the main methodological steps of the approach. 
 
 The inputs needed are:
+
 * weighted metagenes previously computed
 * the community composition obtained after the computation of weighted metagenes
 * information about the datasets
@@ -126,19 +127,19 @@ nb_no_control=length(which(community_stats$nb_control == 0))
 
 `r nrow(community_stats)-nb_bulk_only-nb_sc_only` out of `r nrow(community_stats)` communities are a mixture of bulk and single cell data, `r nb_bulk_only` contains only bulk and `r nb_sc_only` contains only single cell datasets.
 
-`r nb_no_control` out of `r nrow(community_stats)` communities does not contain any control. As we want to focuse on tumor related signals, we can exclude communities containing at least one component from control datasets. Thus we further focuse on `r nb_no_control` communities, which are communities `r which(community_stats$nb_control == 0)`. !!! To discuss with Andrei !!!
+`r nb_no_control` out of `r nrow(community_stats)` communities does not contain any control. As we want to focuse on tumor related signals, we can look in particular at communities not containing one component from control datasets. Thus we further focuse on `r nb_no_control` communities, which are communities `r which(community_stats$nb_control == 0)`.
 
 ## Top-contributing genes
 
 The top-contributing genes (genes with the hightest and smallest weights) are shown below for each component.
-```{r table_driver_genes, echo=FALSE, message=FALSE, warning=FALSE}
+```{r table_contributing_genes, echo=FALSE, message=FALSE, warning=FALSE}
 #for each weighted metagenes of interest, top-contributing genes are the genes beyond 3 SD from the mean
 Mean=colMeans(weighted_metagenes, na.rm = TRUE)
 SD=apply(weighted_metagenes,2,sd, na.rm = TRUE)
   
 nb_pos_tail_3SD=nb_neg_tail_3SD=rep(0,ncol(weighted_metagenes))
 scores_pos_tail_3SD=scores_neg_tail_3SD=rep(0,ncol(weighted_metagenes))
-fn = paste0(tumor_type,"_top_contributing_genes")
+fn = paste0(tumor_type,"_top_top_contributing_genes")
 if (file.exists(fn,showWarnings = FALSE)) {
   #Delete file if it exists
   file.remove(fn)
@@ -152,35 +153,36 @@ for (k in 1:ncol(weighted_metagenes))
   genes_neg_tail= rownames(weighted_metagenes[ind_neg_tail_3SD,])
   genes=c(genes_pos_tail, genes_neg_tail)
   scores=c(weighted_metagenes[ind_pos_tail_3SD,k], weighted_metagenes[ind_neg_tail_3SD,k])
-  driver_genes=data.frame(cbind(paste0("C",k), genes, scores))
-  write.table(driver_genes , paste0(tumor_type,"_top-contributing_genes"), sep="\t", row.names = FALSE, append=TRUE, 
-              col.names=!file.exists( paste0(tumor_type,"_top-contributing_genes")), quote=FALSE)
+  top_contributing_genes=data.frame(cbind(paste0("C",k), genes, scores))
+  write.table(top_contributing_genes , fn, sep="\t", row.names = FALSE, append=TRUE, col.names=!file.exists( fn), quote=FALSE)
 }
 
-driver_genes = read.table(paste0(tumor_type,"_top-contributing_genes"), header = TRUE, sep="\t", as.is=TRUE)
-table_top_drivers=data.frame(Community=numeric(nrow(community_comp)), Driver_pos_tail=numeric(nrow(community_comp)), Driver_neg_tail=numeric(nrow(community_comp)))
+top_contributing_genes = read.table(fn, header = TRUE, sep="\t", as.is=TRUE)
+table_top_contributing_genes=data.frame(Community=numeric(nrow(community_comp)), Driver_pos_tail=numeric(nrow(community_comp)), Driver_neg_tail=numeric(nrow(community_comp)))
 for (i in 1:nrow(community_comp))
 {
-  community = subset(driver_genes, V1==paste0("C",i))
+  community = subset(top_contributing_genes, V1==paste0("C",i))
   community_pos = community[which(community$scores>=0),]
   community_neg = community[which(community$scores<0),]  
   community_pos = community_pos[order(community_pos$scores,decreasing=TRUE),]
   community_neg = community_pos[order(community_neg$scores,decreasing=FALSE),]
   
-  table_top_drivers$Community[i] <- paste0("C",i)
-  table_top_drivers$Driver_pos_tail[i] = paste0(community_pos$genes[1:top_driver_genes], collapse=";")
-  table_top_drivers$Driver_neg_tail[i] = paste0(community_neg$genes[1:top_driver_genes], collapse=";")
+  table_top_contributing_genes$Community[i] <- paste0("C",i)
+  table_top_contributing_genes$Driver_pos_tail[i] = paste0(community_pos$genes[1:top_top_contributing_genes], collapse=";")
+  table_top_contributing_genes$Driver_neg_tail[i] = paste0(community_neg$genes[1:top_top_contributing_genes], collapse=";")
 }
-datatable(table_top_drivers, rownames=FALSE)
+datatable(table_top_contributing_genes, rownames=FALSE)
 ```
 
 # Annotation of the communities using GO, KEGG, MSigDB and DO
 
-To decipher the mechnanisms active in the communities, we extracted the top-contributing genes in each community and performed over representation analysis as well as gene set enrichment analyses using MSigDB (http://www.gsea-msigdb.org/gsea/msigdb/collections.jsp) on each community.
+To decipher the mechnanisms active in the communities, we extracted the top-contributing genes in each community and performed over representation analysis (hypergeometric tests) as well as gene set enrichment analyses (Kolmogorov tests).
 
 ## Over representation analysis of the top-contributing genes and gene set enrichment analysis for each community
 
-Now we can describe each component in details. We used GO, KEGG and DO ontology to annotate the communities. Results are represented in dotplots, cnetplots ans emaplots for both drviers of the positive and negative tails using clusterProfiler (https://bookdown.org/yihui/rmarkdown/html-document.html). If the OR analysis had no enrichment in one or the two tails, no plot are reported. We used GO, KEGG and disease ontology databases.
+Now we can describe each component in details. We used GO, KEGG, MSigDB (http://www.gsea-msigdb.org/gsea/msigdb/collections.jsp) and DO ontology to annotate the communities. Results are represented in dotplots, cnetplots and emaplots for both drivers of the positive and negative tails using clusterProfiler (https://bookdown.org/yihui/rmarkdown/html-document.html). If the OR analysis had no enrichment in one or the two tails, no plot are reported.
+
+We defined top-contributing genes as genes having a weight below and beyond 3 sd +/- mean of the weights for each community.
 
 ```{r communities_OR_details, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
 gcSample_pos = list()
@@ -206,7 +208,7 @@ for (i in 1:nrow(community_comp)) #nrow(community_comp)
 
 
 ## Overview of over representation analysis in top-contributing genes of all communities
-top-contributing genes were submitted to over representation analysis. First, we show an overview of the top-contributing genes coming from the postive and negative tails for all components and next, we give details about each component.
+We provide here an overview of the top-contributing genes coming from the positive and negative tails for all components for GO, KEGG and DO annotations.
 
 ```{r communities_overview, echo=FALSE, message = FALSE, warning = FALSE, fig.height=30, fig.width=40}
 #, fig.cap=c("KEGG overrepresentation of positive tail", "KEGG overrepresentation of negative tail", "GO overrepresentation of positive tail", "GO overrepresentation of negative tail", "DO overrepresentation of positive tail", "DO overrepresentation of negative tail")
@@ -277,7 +279,7 @@ For that, we performed over representation analysis of the top-contributing gene
 
 ```{r communities_OR_TF_gene_sets, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
 
-TF = "gene_sets/TF_targets_dorothea_A-D_hs.gmt"
+TF = "gene_sets/TF/TF_targets_dorothea_A-D_hs.gmt"
 TFgs <- read.gmt(TF)
 egmt_pos_combine=data.frame(matrix(nrow=0,ncol=10))
 egmt_neg_combine=data.frame(matrix(nrow=0,ncol=10))
@@ -293,13 +295,13 @@ for (i in 1:nrow(community_comp) )
 `r paste(out_TFgs, collapse='\n')`
 
 ```{r communities_OR_TF_gene_sets_datatable, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
-datatable(egmt_pos_combine_reordered, rownames = FALSE)
-datatable(egmt_neg_combine_reordered, rownames = FALSE)
+datatable(egmt_pos_combine_reordered, rownames = FALSE, caption="\n\n\nEnrichment in TF gene sets for top-contributing genes (pos tail)")
+datatable(egmt_neg_combine_reordered, rownames = FALSE, caption="\n\n\nEnrichment in TF gene sets for top-contributing genes (pos tail)")
 ```
 
 For each community, a total of `r length(unique(TFgs$term))` gene sets are tested. 
 
-There are a total of `r nrow(egmt_pos_combine_reordered)` significant enrichments in positive tails and `r nrow(egmt_neg_combine_reordered)` significant enrichment in negative tails.
+There are a total of `r nrow(egmt_pos_combine_reordered)` significant enrichments in positive tails and `r nrow(egmt_neg_combine_reordered)` significant enrichments in negative tails.
 
 There are `r length(unique(egmt_pos_combine_reordered$ID))`  unique TFs with significant enrichments in their targets in the top-contributing genes of the positive tails and `r length(unique(egmt_neg_combine_reordered$ID))` unique TFs with significant enrichments in their targers in the top-contributing genes of the negative tails.
 
@@ -330,8 +332,8 @@ for (i in 1:nrow(community_comp) )
 `r paste(out_sgs, collapse='\n')`
 
 ```{r communities_OR_personnalized_gene_sets_datatable, echo=FALSE, message=FALSE, warning = FALSE,fig.fullwidth = TRUE, fig.width=12}
-datatable(egmt_pos_combine_reordered, rownames = FALSE)
-datatable(egmt_neg_combine_reordered, rownames = FALSE)
+datatable(egmt_pos_combine_reordered, rownames = FALSE, caption="\n\n\nEnrichment in user defined gene sets for top-contributing genes (pos tail)")
+datatable(egmt_neg_combine_reordered, rownames = FALSE, caption="\n\n\nEnrichment in user defined gene sets for for top-contributing genes (pos tail)")
 
 egmt_pos_combine_reordered_ID=egmt_pos_combine_reordered[grep("^IC",egmt_pos_combine_reordered$ID),]
 egmt_neg_combine_reordered_ID=egmt_neg_combine_reordered[grep("^IC",egmt_neg_combine_reordered$ID),]
@@ -345,8 +347,8 @@ For each community, a total of `r length(unique(sgs$term))` gene sets are tested
 
 There are a total of `r nrow(egmt_pos_combine_reordered)` significant enrichments in positive tails and `r nrow(egmt_neg_combine_reordered)` significant enrichment in negative tails.
 
-`r length(grep("^IC",egmt_pos_combine_reordered$ID))` IC are retrieved in positive tails and `r length(grep("^IC",egmt_neg_combine_reordered$ID))` IC are retrieved in negative tails.
+`r length(grep("^IC",egmt_pos_combine_reordered$ID))` IC are found in positive tails and `r length(grep("^IC",egmt_neg_combine_reordered$ID))` IC are found in negative tails.
 
 `r length(unique(egmt_pos_combine_reordered$ID[grep("^IC",egmt_pos_combine_reordered$ID)]))` IC (`r length(unique(egmt_pos_combine_reordered_ID$ID[grep("[+]",egmt_pos_combine_reordered_ID$ID)]))` IC+ and `r length(unique(egmt_pos_combine_reordered_ID$ID[grep("-",egmt_pos_combine_reordered_ID$ID)]))` IC-) are retrieved in positive tails and `r length(unique(egmt_neg_combine_reordered$ID[grep("^IC",egmt_neg_combine_reordered$ID)]))` IC (`r length(unique(egmt_neg_combine_reordered_ID$ID[grep("[+]",egmt_neg_combine_reordered_ID$ID)]))` IC+ and `r length(unique(egmt_neg_combine_reordered_ID$ID[grep("-",egmt_neg_combine_reordered_ID$ID)]))` IC-) are retrieved in negative tails.
 
-`r unique_IC_pos` IC+ and `r unique_IC_neg` IC- are retrived.
+`r unique_IC_pos` IC+ and `r unique_IC_neg` IC- are retrived, whatever the tail in this analysis.
